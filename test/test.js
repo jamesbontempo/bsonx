@@ -1,184 +1,259 @@
-const { Int32 } = require("bson");
+const { BSON } = require("bson");
 const { BSONX } = require("../dist/index");
 
 const expect = require("chai").expect;
 
 const NOW = new Date();
 
-const items = {
-    array: [1, 2],
-    bigint: 9007199254740992n,
-    bigint64array: new BigInt64Array([(-1 * Math.pow(2, 63)).toString()]),
-    biguint64array: new BigUint64Array([(Math.pow(2, 64) - 1).toString()]),
-    boolean: true,
-    date: NOW,
-    error: new Error(),
-    float32array: new Float32Array([1.2e-38]),
-    float64array: new Float64Array([5e-324]),
-    function: (name) => { return "Hello " + name + "!"; },
-    int8array: new Int8Array([-128]),
-    int16array: new Int16Array([-32768]),
-    int32array: new Int32Array([-2147483648]),
-    map: new Map([[1, "one"]]),
-    null: null,
-    number: 12.345,
-    object: {id: 1, array: [13, 17, "fifty"], set: new Map([[1, ["one", "uno"]], [2, "two"]])},
-    regexp: /^\((.*)\)$/g,
-    set: new Set([1]),
-    string: "test",
-    symbol: Symbol("foo"),
-    uint8array: new Uint8Array([255]),
-    uint16array: new Uint16Array([32767]),
-    uint32array: new Uint32Array([4294967295]),
-    uint8clampedarray: new Uint8ClampedArray([1337]),
-    undefined: undefined
-};
-
-describe("BSONX tests", () => {
-    it("Array", () => {
-        const item = items["array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-    });
+describe("Primitives", () => {
 
     it("BigInt", () => {
-        const item = items["bigint"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.equal(9007199254740992n);
+        const input = 9007199254740992n;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.equal(9007199254740992n);
     });
 
-    it("BigInt64Array", () => {
-        const item = items["bigint64array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
+    it("Boolean (true)", () => {
+        const input = true;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.true;
     });
 
-    it("BigUInt64Array", () => {
-        const item = items["biguint64array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-    });
-
-    it("Boolean", () => {
-        const item = items["boolean"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.equal(item);
+    it("Boolean (true)", () => {
+        const input = false;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.false;
     });
 
     it("Date", () => {
-        const item = items["date"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(NOW);
-    });
-
-    it("Error", () => {
-        const item = items["error"];
-        let e = null;
-        try {
-            BSONX.serialize(item);
-        } catch (error) {
-            e = error;
-        }
-        expect(e).to.be.an("Error");
-    });
-
-    it("Float32Array", () => {
-        const item = items["float32array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-    });
-
-    it("Float64Array", () => {
-        const item = items["float64array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
+        const input = NOW;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(NOW);
     });
 
     it("Function", () => {
-        const item = items["function"];
-        expect(BSONX.deserialize(BSONX.serialize(item))("James")).to.equal("Hello James!");
-    });
-
-    it("Int8Array", () => {
-        const item = items["int8array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(-128);
-    });
-
-    it("Int16Array", () => {
-        const item = items["int16array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(-32768);
-    });
-
-    it("Int32Array", () => {
-        const item = items["int32array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(-2147483648);
+        const input = (name) => { return "Hello " + name + "!"; };
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output("James")).to.equal("Hello James!");
     });
 
     it("Map", () => {
-        const item = items["map"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item)).get(1)).to.equal("one");
+        const input = new Map([[1, "one"], [2, false]]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.get(1)).to.equal("one");
     });
 
     it("Null", () => {
-        const item = items["null"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.equal(item);
+        const input = null;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.equal(input);
     });
 
     it("Number", () => {
-        const item = items["number"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.equal(item);
+        const input = 12.345;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.equal(input);
     });
 
     it("Object", () => {
-        const item = items["object"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item)).set.get(1)[1]).to.equal("uno");
+        const input = {id: 1, array: [13, 17, "fifty"], set: new Map([[1, ["one", "uno"]], [2, "two"]])};
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.set.get(1)[1]).to.equal("uno");
     });
 
     it("RegExp", () => {
-        const item = items["regexp"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item)).exec("(BSONX)")[1]).to.equal("BSONX");
+        const input = /^\((.*)\)$/g;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.exec("(BSONX)")[1]).to.equal("BSONX");
     });
 
     it("Set", () => {
-        const item = items["set"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item)).has(1)).to.equal(true);
+        const input = new Set([1, 2, 3]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.has(1)).to.equal(true);
     });
 
     it("String", () => {
-        const item = items["string"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.equal(item);
+        const input = "test";
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.equal(input);
     });
 
     it("Symbol", () => {
-        const item = items["symbol"];
-        expect(BSONX.deserialize(BSONX.serialize(item)).toString()).to.equal(item.toString());
-    });
-
-    it("UInt8Array", () => {
-        const item = items["uint8array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(255);
-    });
-
-    it("UInt16Array", () => {
-        const item = items["uint16array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(32767);
-    });
-
-    it("UInt32Array", () => {
-        const item = items["uint32array"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(4294967295);
-    });
-
-    it("UInt8ClampedArray", () => {
-        const item = items["uint8clampedarray"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.deep.equal(item);
-        expect(BSONX.deserialize(BSONX.serialize(item))[0]).to.equal(255);
+        const input = Symbol("test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(BSONX.deserialize(BSONX.serialize(input)).toString()).to.equal(input.toString());
     });
 
     it("Undefined", () => {
-        const item = items["undefined"];
-        expect(BSONX.deserialize(BSONX.serialize(item))).to.be.undefined;
+        const input = undefined;
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.undefined;
     });
+
 });
+
+describe("Arrays", () => {
+
+    it("Array", () => {
+        const input = [1, 2];
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+    });
+
+    it("BigInt64Array", () => {
+        const input = new BigInt64Array([(-1 * Math.pow(2, 63)).toString()]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+    });
+
+    it("BigUInt64Array", () => {
+        const input = new BigUint64Array([(Math.pow(2, 64) - 1).toString()]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+    });
+
+    it("Float32Array", () => {
+        const input = new Float32Array([1.2e-38]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+    });
+
+    it("Float64Array", () => {
+        const input = new Float64Array([5e-324]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+    });
+
+    it("Int8Array", () => {
+        const input = new Int8Array([-128]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(-128);
+    });
+
+    it("Int16Array", () => {
+        const input = new Int16Array([-32768]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(-32768);
+    });
+
+    it("Int32Array", () => {
+        const input = new Int32Array([-2147483648]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(-2147483648);
+    });
+
+    it("UInt8Array", () => {
+        const input = new Uint8Array([255]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(255);
+    });
+
+    it("UInt16Array", () => {
+        const input = new Uint16Array([32767]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(32767);
+    });
+
+    it("UInt32Array", () => {
+        const input = new Uint32Array([4294967295]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(4294967295);
+    });
+
+    it("UInt8ClampedArray", () => {
+        const input = new Uint8ClampedArray([1337]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output[0]).to.equal(255);
+    });
+
+});
+
+describe("Errors", () => {
+
+    it("Error", () => {
+        const input = new Error("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(Error);
+        expect(output.message).to.equal("Test");
+    });
+
+    it("EvalError", () => {
+        const input = new EvalError("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(EvalError);
+        expect(output.message).to.equal("Test");
+    });
+
+    it("RangeError", () => {
+        const input = new RangeError("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(RangeError);
+        expect(output.message).to.equal("Test");
+    });
+
+    it("ReferenceError", () => {
+        const input = new ReferenceError("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(ReferenceError);
+        expect(output.message).to.equal("Test");
+    });
+
+    it("SyntaxError", () => {
+        const input = new SyntaxError("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(SyntaxError);
+        expect(output.message).to.equal("Test");
+    });
+
+    it("TypeError", () => {
+        const input = new TypeError("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(TypeError);
+        expect(output.message).to.equal("Test");
+    });
+
+    it("URIError", () => {
+        const input = new URIError("Test");
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.be.an.instanceOf(URIError);
+        expect(output.message).to.equal("Test");
+    });
+
+})
+
+describe("Failures", () => {
+
+    it("Unknown (serialize)", () => {
+        let e = null;
+        try {
+            BSONX.serialize(new WeakMap());
+        } catch (error) {
+            expect(error).to.be.an.instanceOf(TypeError);
+        }
+    });
+
+    it("Unknown (deserialze)", () => {
+        const input = BSON.serialize({type: "foo", value: "bar"});
+        let e = null;
+        try {
+            BSONX.deserialize(input);
+        } catch (error) {
+            expect(error).to.be.an.instanceOf(TypeError);
+        }
+    });
+
+});
+
+BSONX.deserialize(BSONX.serialize(new Error("Test")));

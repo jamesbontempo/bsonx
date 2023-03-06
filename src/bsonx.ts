@@ -5,25 +5,32 @@ const BSONXTypes: Record<string, number> = {
     "biguint64array": 4,
     "boolean": 5,
     "date": 6,
-    "float32array": 7,
-    "float64array": 8,
-    "function": 9,
-    "int8array": 10,
-    "int16array": 11,
-    "int32array": 12,
-    "map": 13,
-    "null": 14,
-    "number": 15,
-    "object": 16,
-    "regexp": 17,
-    "set": 18,
-    "string": 19,
-    "symbol": 20,
-    "uint8array": 21,
-    "uint16array": 22,
-    "uint32array": 23,
-    "uint8clampedarray": 24,
-    "undefined": 25
+    "error": 7,
+    "evalerror": 8,
+    "float32array": 9,
+    "float64array": 10,
+    "function": 11,
+    "int8array": 12,
+    "int16array": 13,
+    "int32array": 14,
+    "map": 15,
+    "null": 16,
+    "number": 17,
+    "object": 18,
+    "rangeerror": 19,
+    "referenceerror": 20,
+    "regexp": 21,
+    "set": 22,
+    "string": 23,
+    "symbol": 24,
+    "syntaxerror": 25,
+    "typeerror": 26,
+    "uint8array": 27,
+    "uint16array": 28,
+    "uint32array": 29,
+    "uint8clampedarray": 30,
+    "undefined": 31,
+    "urierror": 32
 };
 
 const PRIMITIVES: Array<string> = [
@@ -54,6 +61,16 @@ const ARRAYS: Array<string> = [
     "uint8clampedarray"
 ];
 
+const ERRORS = [
+    "error",
+    "evalerror",
+    "rangeerror",
+    "referenceerror",
+    "syntaxerror",
+    "typeerror",
+    "urierror",
+];
+
 import { BSON } from "bson";
 
 
@@ -65,13 +82,19 @@ export function deserialize(item: Uint8Array): any {
     return deobjectify(BSON.deserialize(item));
 }
 
+type primitive = bigint|boolean|Date|Function|number|null|RegExp|string|symbol|undefined;
+
+type array = Array<any>|BigInt64Array|BigUint64Array|Float32Array|Float64Array|Int8Array|Int16Array|Int32Array|Uint8Array|Uint16Array|Uint32Array|Uint8ClampedArray;
+
+type error = Error|EvalError|RangeError|ReferenceError|SyntaxError|TypeError|URIError;
+
 function objectify(item: any) {
-    const type = typeOf(item);
+    const type: string = typeOf(item);
     const object: Record<string, any> = {};
     object["type"] = BSONXTypes[type];
     object["data"] = [];
-    if (isArray(item)) {
-        const size = item.length;
+    if (isArray(type)) {
+        const size: number = item.length;
         object["size"] = size;
         for (let i = 0; i < size; i++) {
             object["data"].push(objectify(item[i]));
@@ -92,40 +115,42 @@ function objectify(item: any) {
             object["data"].push([objectify(key), objectify(value)]);
             object["size"]++;
         }
-    } else if (isPrimitive(item)) {
+    } else if (isPrimitive(type)) {
         if (type === "symbol") {
-            const symbol = /^Symbol\((.*)\)$/.exec(toString(item));
-            object["data"] = (symbol) ? symbol[1] : "";
+            const matches: RegExpMatchArray|null = /^Symbol\((.*)\)$/.exec(toString(item));
+            object["data"] = (matches) ? matches[1] : undefined;
         } else {
             object["data"] = toString(item);
         }
+    } else if (isError(type)) {
+        object["data"] = item.message;
     } else {
-        throw new TypeError("Don't know how to objectify a " + type);
+        throw new TypeError("Don't know how to serialize type: " + type);
     }
     return object;
 }
 
-function deobjectify(item: Record<string, any>) {
-    const type = keyOf(BSONXTypes, item["type"]);
-    if (ARRAYS.includes(type)) {
-        const size = item["size"];
-        const array = newArray(type, item["size"]);
+function deobjectify(item: Record<string, any>): any {
+    const type: string = keyOf(BSONXTypes, item["type"]);
+    if (isArray(type)) {
+        const size: number = item["size"];
+        const array: array = newArray(type, item["size"]);
         for (let i = 0; i < size; i++) {
             const value = deobjectify(item["data"][i]);
             array[i] = value;
         }
         return array;
     } else if (type === "set") {
-        const size = item["size"];
-        const set = new Set();
+        const size: number = item["size"];
+        const set: Set<any> = new Set();
         for (let i = 0; i < size; i++) {
             const value = deobjectify(item["data"][i]);
             set.add(value);
         }
         return set;
     } else if (type === "map") {
-        const size = item["size"];
-        const map = new Map();
+        const size: number = item["size"];
+        const map: Map<any, any> = new Map();
         for (let i = 0; i < size; i++) {
             const key = deobjectify(item["data"][i][0]);
             const value = deobjectify(item["data"][i][1]);
@@ -133,7 +158,7 @@ function deobjectify(item: Record<string, any>) {
         }
         return map;
     } else if (type === "object") {
-        const size = item["size"];
+        const size: number = item["size"];
         const object: Record<string, any> = new Object();
         for (let i = 0; i < size; i++) {
             const key = deobjectify(item["data"][i][0]);
@@ -141,14 +166,16 @@ function deobjectify(item: Record<string, any>) {
             object[key] = value;
         }
         return object;
-    } else if (PRIMITIVES.includes(type)) {
+    } else if (isPrimitive(type)) {
         return toPrimitive(item);
+    } else if (isError(type)) {
+        return toError(item);
     } else {
-        throw new TypeError("Don't know how to deobjectify a " + type);
+        throw new TypeError("Don't know how to deserialize type: " + type);
     }
 }
 
-function newArray(type: string, size: number): Array<any>|BigInt64Array|BigUint64Array|Float32Array|Float64Array|Int8Array|Int16Array|Int32Array|Uint8Array|Uint16Array|Uint32Array|Uint8ClampedArray {
+function newArray(type: string, size: number): array {
     switch(type) {
         case "bigint64array":
             return new BigInt64Array(size);
@@ -177,9 +204,9 @@ function newArray(type: string, size: number): Array<any>|BigInt64Array|BigUint6
     }
 }
 
-function toPrimitive(item: any): any {
-    const type = keyOf(BSONXTypes, item["type"]);
-    const data = item["data"];
+function toPrimitive(item: Record<string, primitive>): primitive {
+    const type: string = keyOf(BSONXTypes, item["type"]);
+    const data: any = item["data"];
     switch(type) {
         case "bigint":
             return BigInt(data);
@@ -205,28 +232,58 @@ function toPrimitive(item: any): any {
     }
 }
 
-function isPrimitive(item: any): boolean {
-    return PRIMITIVES.includes(typeOf(item));
+function toError(item: Record<string, number|string>): error {
+    const type: string = keyOf(BSONXTypes, item["type"]);
+    const data: any = item["data"];
+    switch(type) {
+        case "evalerror":
+            return new EvalError(data);
+        case "rangeerror":
+            return new RangeError(data);
+        case "referenceerror":
+            return new ReferenceError(data);
+        case "syntaxerror":
+            return new SyntaxError(data);
+        case "typeerror":
+            return new TypeError(data);
+        case "urierror":
+            return new URIError(data);
+        default:
+            return new Error(data);
+    }
 }
 
-function isArray(item: any): boolean {
-    return ARRAYS.includes(typeOf(item));
+function isPrimitive(type: string): boolean {
+    return PRIMITIVES.includes(type);
+}
+
+function isArray(type: string): boolean {
+    return ARRAYS.includes(type);
+}
+
+function isError(type: string): boolean {
+    return ERRORS.includes(type);
 }
 
 function typeOf(item: any): string {
-	const type = typeof item;
-	if (type !== "object") {
-		return type;
-	} else if (item === null) {
-		return "null";
-	} else {
-		return Object.prototype.toString.call(item).slice(8,-1).toLowerCase();
-	}
+    let type: string = typeof item;
+    if (type !== "object") {
+        return type;
+    } else if (item === null) {
+        return "null";
+    } else {
+        type = Object.prototype.toString.call(item).slice(8,-1).toLowerCase();
+        if (type === "error") {
+            return item.name.toLowerCase();
+        } else {
+            return type;
+        }
+    }
 }
 
 function keyOf(object: Record<string, any>, value: any): string {
-    const key = Object.keys(object).find((key) => object[key] === value);
-    return key || "n/a";
+    const key: string|undefined = Object.keys(object).find((key) => object[key] === value);
+    return key || "unknown";
 }
 
 function toString(item: any): string {

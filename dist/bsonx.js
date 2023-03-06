@@ -8,25 +8,32 @@ const BSONXTypes = {
     "biguint64array": 4,
     "boolean": 5,
     "date": 6,
-    "float32array": 7,
-    "float64array": 8,
-    "function": 9,
-    "int8array": 10,
-    "int16array": 11,
-    "int32array": 12,
-    "map": 13,
-    "null": 14,
-    "number": 15,
-    "object": 16,
-    "regexp": 17,
-    "set": 18,
-    "string": 19,
-    "symbol": 20,
-    "uint8array": 21,
-    "uint16array": 22,
-    "uint32array": 23,
-    "uint8clampedarray": 24,
-    "undefined": 25
+    "error": 7,
+    "evalerror": 8,
+    "float32array": 9,
+    "float64array": 10,
+    "function": 11,
+    "int8array": 12,
+    "int16array": 13,
+    "int32array": 14,
+    "map": 15,
+    "null": 16,
+    "number": 17,
+    "object": 18,
+    "rangeerror": 19,
+    "referenceerror": 20,
+    "regexp": 21,
+    "set": 22,
+    "string": 23,
+    "symbol": 24,
+    "syntaxerror": 25,
+    "typeerror": 26,
+    "uint8array": 27,
+    "uint16array": 28,
+    "uint32array": 29,
+    "uint8clampedarray": 30,
+    "undefined": 31,
+    "urierror": 32
 };
 const PRIMITIVES = [
     "bigint",
@@ -54,6 +61,15 @@ const ARRAYS = [
     "uint32array",
     "uint8clampedarray"
 ];
+const ERRORS = [
+    "error",
+    "evalerror",
+    "rangeerror",
+    "referenceerror",
+    "syntaxerror",
+    "typeerror",
+    "urierror",
+];
 const bson_1 = require("bson");
 function serialize(item) {
     return bson_1.BSON.serialize(objectify(item));
@@ -68,7 +84,7 @@ function objectify(item) {
     const object = {};
     object["type"] = BSONXTypes[type];
     object["data"] = [];
-    if (isArray(item)) {
+    if (isArray(type)) {
         const size = item.length;
         object["size"] = size;
         for (let i = 0; i < size; i++) {
@@ -94,23 +110,26 @@ function objectify(item) {
             object["size"]++;
         }
     }
-    else if (isPrimitive(item)) {
+    else if (isPrimitive(type)) {
         if (type === "symbol") {
-            const symbol = /^Symbol\((.*)\)$/.exec(toString(item));
-            object["data"] = (symbol) ? symbol[1] : "";
+            const matches = /^Symbol\((.*)\)$/.exec(toString(item));
+            object["data"] = (matches) ? matches[1] : undefined;
         }
         else {
             object["data"] = toString(item);
         }
     }
+    else if (isError(type)) {
+        object["data"] = item.message;
+    }
     else {
-        throw new TypeError("Don't know how to objectify a " + type);
+        throw new TypeError("Don't know how to serialize type: " + type);
     }
     return object;
 }
 function deobjectify(item) {
     const type = keyOf(BSONXTypes, item["type"]);
-    if (ARRAYS.includes(type)) {
+    if (isArray(type)) {
         const size = item["size"];
         const array = newArray(type, item["size"]);
         for (let i = 0; i < size; i++) {
@@ -148,11 +167,14 @@ function deobjectify(item) {
         }
         return object;
     }
-    else if (PRIMITIVES.includes(type)) {
+    else if (isPrimitive(type)) {
         return toPrimitive(item);
     }
+    else if (isError(type)) {
+        return toError(item);
+    }
     else {
-        throw new TypeError("Don't know how to deobjectify a " + type);
+        throw new TypeError("Don't know how to deserialize type: " + type);
     }
 }
 function newArray(type, size) {
@@ -210,14 +232,37 @@ function toPrimitive(item) {
             return undefined;
     }
 }
-function isPrimitive(item) {
-    return PRIMITIVES.includes(typeOf(item));
+function toError(item) {
+    const type = keyOf(BSONXTypes, item["type"]);
+    const data = item["data"];
+    switch (type) {
+        case "evalerror":
+            return new EvalError(data);
+        case "rangeerror":
+            return new RangeError(data);
+        case "referenceerror":
+            return new ReferenceError(data);
+        case "syntaxerror":
+            return new SyntaxError(data);
+        case "typeerror":
+            return new TypeError(data);
+        case "urierror":
+            return new URIError(data);
+        default:
+            return new Error(data);
+    }
 }
-function isArray(item) {
-    return ARRAYS.includes(typeOf(item));
+function isPrimitive(type) {
+    return PRIMITIVES.includes(type);
+}
+function isArray(type) {
+    return ARRAYS.includes(type);
+}
+function isError(type) {
+    return ERRORS.includes(type);
 }
 function typeOf(item) {
-    const type = typeof item;
+    let type = typeof item;
     if (type !== "object") {
         return type;
     }
@@ -225,12 +270,18 @@ function typeOf(item) {
         return "null";
     }
     else {
-        return Object.prototype.toString.call(item).slice(8, -1).toLowerCase();
+        type = Object.prototype.toString.call(item).slice(8, -1).toLowerCase();
+        if (type === "error") {
+            return item.name.toLowerCase();
+        }
+        else {
+            return type;
+        }
     }
 }
 function keyOf(object, value) {
     const key = Object.keys(object).find((key) => object[key] === value);
-    return key || "n/a";
+    return key || "unknown";
 }
 function toString(item) {
     switch (typeOf(item)) {
