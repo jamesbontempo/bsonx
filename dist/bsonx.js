@@ -151,6 +151,9 @@ function deobjectify(item) {
     else if (PRIMITIVES.includes(type)) {
         return toPrimitive(item);
     }
+    else {
+        throw new TypeError("Don't know how to deobjectify a " + type);
+    }
 }
 function newArray(type, size) {
     switch (type) {

@@ -143,6 +143,8 @@ function deobjectify(item: Record<string, any>) {
         return object;
     } else if (PRIMITIVES.includes(type)) {
         return toPrimitive(item);
+    } else {
+        throw new TypeError("Don't know how to deobjectify a " + type);
     }
 }
 
