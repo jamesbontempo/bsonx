@@ -8,11 +8,11 @@ The "x" equals "extra"!
 
 Import `bsonx`
 ```js
-import { BSONX } from "bsonx";
+import { BSONX } from "@jamesbontempo/bsonx";
 ```
 ... or ...
 ```js
-const { BSONX } = require("bsonx");
+const { BSONX } = require("@jamesbontempo/bsonx");
 ```
 
 Serialize a standard JSON object
@@ -110,9 +110,9 @@ Returns the original item as a native JavaScript object.
  `bsonx` does not implment the entire `bson` interface, only the `serialize` and `deserialize` methods. However, if that's all you're using `bson` for, you can use `bsonx` as a drop-in replacement and start serializing a wider range of objects:
 
  ```js
- import { BSONX as BSON } from "bsonx";
+ import { BSONX as BSON } from "@jamesbontempo/bsonx";
  ```
  ... or ...
  ```js
- const { BSONX: BSON } = require("bsonx");
+ const { BSONX: BSON } = require("@jamesbontempo/bsonx");
  ```
