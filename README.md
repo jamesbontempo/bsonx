@@ -6,22 +6,33 @@ The "x" equals "extra"!
 
 ## Examples
 
+Import `bsonx`
+```js
+import { BSONX } from "bsonx";
+```
+... or ...
 ```js
 const { BSONX } = require("bsonx");
+```
 
-// Serialize a standard JSON object
+Serialize a standard JSON object
+```js
 const serialized = BSONX.serialize({ id: 1, string: "test", number: 123, array: [3, 4, 5] });
 // <Buffer 12 04 00 00 00 17 02 00 00 00 69 64 11 01 00 00 00 31 17 ... >
 const deserialized = BSONX.deserialize(serialized);
 // { id: 1, string: 'test', number: 123, array: [ 3, 4, 5 ] }
+```
 
-// Serialize a JSON object that contains a BigInt
+Serialize a JSON object that contains a BigInt
+```js
 const serialized = BSONX.serialize({ bigint: 99999999999999999999999n });
 // <Buffer 12 01 00 00 00 17 06 00 00 00 62 69 67 69 6e 74 02 17 00 ... >
 const deserialized = BSONX.deserialize(serialized);
 // { bigint: 99999999999999999999999n }
+```
 
-// Serialize a solitary Map
+Serialize a solitary Map
+```js
 const serialized = BSONX.serialize(new Map([[1, ["one", "uno"]], [2, ["two", "dos"]]]));
 // <Buffer 0f 02 00 00 00 11 01 00 00 00 31 01 02 00 00 00 17 03 00 ... >
 const deserialized = BSONX.deserialize(serialized);
