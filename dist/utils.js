@@ -1,7 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.typeOf = exports.isMap = exports.isSet = exports.isObject = exports.isSymbol = exports.isString = exports.isError = exports.isArray = exports.isPrimitive = void 0;
+exports.typeOf = exports.isMap = exports.isSet = exports.isObject = exports.isString = exports.isError = exports.isArray = exports.isPrimitive = exports.isAllowable = void 0;
 const constants_1 = require("./constants");
+function isAllowable(item) {
+    return constants_1.BSONXTypes[typeOf(item)] !== undefined;
+}
+exports.isAllowable = isAllowable;
 function isPrimitive(item) {
     return constants_1.BSONXTypes[typeOf(item)].type === "primitive";
 }
@@ -18,10 +22,6 @@ function isString(item) {
     return typeOf(item) === "string";
 }
 exports.isString = isString;
-function isSymbol(item) {
-    return typeOf(item) === "symbol";
-}
-exports.isSymbol = isSymbol;
 function isObject(item) {
     return constants_1.BSONXTypes[typeOf(item)].type === "object";
 }

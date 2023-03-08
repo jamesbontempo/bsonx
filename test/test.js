@@ -238,23 +238,27 @@ describe("Errors", () => {
 
 describe("Failures", () => {
 
-    it("Unknown (serialize)", () => {
+    it("Unknown type (serialize)", () => {
         let e = null;
         try {
-            BSONX.serialize(new WeakMap());
+            BSONX.serialize(new Blob([]));
         } catch (error) {
-            expect(error).to.be.an.instanceOf(TypeError);
+            e = error;
         }
+        expect(e).to.be.an.instanceOf(TypeError);
+        expect(e.message).to.match(/^Don't know how to serialize type \(received "blob"\)$/);
     });
 
-    it("Unknown (deserialze)", () => {
-        const input = Buffer.from("12000000ff0100000017020000006964050100000001", "hex")
+    it("Unknown type (deserialze)", () => {
+        const input = Buffer.from("ff010000000100000017020000006964050100000001", "hex")
         let e = null;
         try {
             BSONX.deserialize(input);
         } catch (error) {
-            expect(error).to.be.an.instanceOf(TypeError);
+            e = error;
         }
+        expect(e).to.be.an.instanceOf(TypeError);
+        expect(e.message).to.match(/^Don't know how to deserialize type \(received 255\)/);
     });
 
 });

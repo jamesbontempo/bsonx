@@ -1,9 +1,9 @@
 import { primitive, array, error, allowable } from "./types";
+export declare function isAllowable(item: any): item is allowable;
 export declare function isPrimitive(item: allowable): item is primitive;
 export declare function isArray(item: allowable): item is array;
 export declare function isError(item: allowable): item is error;
 export declare function isString(item: allowable): item is string;
-export declare function isSymbol(item: allowable): item is symbol;
 export declare function isObject(item: allowable): item is object;
 export declare function isSet(item: allowable): item is Set<any>;
 export declare function isMap(item: allowable): item is Map<any, any>;

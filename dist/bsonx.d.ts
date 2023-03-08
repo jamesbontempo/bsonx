@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { Buffer } from "node:buffer";
 import { allowable } from "./types";
-export declare function serialize(item: any): Buffer;
+export declare function serialize(item: allowable): Buffer;
 export declare class Serializer {
     #private;
     constructor();

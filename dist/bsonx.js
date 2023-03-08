@@ -26,6 +26,8 @@ class Serializer {
     }
     serialize(item) {
         const type = (0, utils_1.typeOf)(item);
+        if (!(0, utils_1.isAllowable)(item))
+            throw new TypeError("Don't know how to serialize type (received \"" + type + "\")");
         const typeBuffer = node_buffer_1.Buffer.from([constants_1.BSONXTypes[type].code]);
         const sizeBuffer = node_buffer_1.Buffer.alloc(4);
         let dataBuffer = new Uint8Array();
@@ -66,9 +68,6 @@ class Serializer {
             dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, __classPrivateFieldGet(this, _Serializer_instances, "m", _Serializer_toBuffer).call(this, type, item)]);
             sizeBuffer.writeUInt32LE(dataBuffer.length);
         }
-        else {
-            throw new TypeError("Don't know how to serialize type (received " + type + ")");
-        }
         return node_buffer_1.Buffer.concat([typeBuffer, sizeBuffer, dataBuffer]);
     }
 }
@@ -108,7 +107,10 @@ class Deserializer {
 }
 exports.Deserializer = Deserializer;
 _Deserializer_buffer = new WeakMap(), _Deserializer_index = new WeakMap(), _Deserializer_instances = new WeakSet(), _Deserializer_deserialize = function _Deserializer_deserialize() {
-    const type = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_typeFrom).call(this, __classPrivateFieldGet(this, _Deserializer_buffer, "f")[__classPrivateFieldGet(this, _Deserializer_index, "f")]);
+    const code = __classPrivateFieldGet(this, _Deserializer_buffer, "f")[__classPrivateFieldGet(this, _Deserializer_index, "f")];
+    const type = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_typeFrom).call(this, code);
+    if (type === "unknown")
+        throw new TypeError("Don't know how to deserialize type (received " + code + ")");
     const size = __classPrivateFieldGet(this, _Deserializer_buffer, "f").readInt32LE(__classPrivateFieldGet(this, _Deserializer_index, "f") + 1);
     __classPrivateFieldSet(this, _Deserializer_index, __classPrivateFieldGet(this, _Deserializer_index, "f") + 5, "f");
     if (constants_1.ARRAYS.includes(type)) {
@@ -139,11 +141,11 @@ _Deserializer_buffer = new WeakMap(), _Deserializer_index = new WeakMap(), _Dese
         for (let i = 0; i < size; i++) {
             const key = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
             const value = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
-            if ((0, utils_1.isString)(key) || (0, utils_1.isSymbol)(key)) {
+            if ((0, utils_1.isString)(key)) {
                 object[key] = value;
             }
             else {
-                throw new TypeError("Oject property names can only be strings or symbols (received " + (0, utils_1.typeOf)(key) + ")");
+                throw new TypeError("Oject property names can only be strings (received " + (0, utils_1.typeOf)(key) + ")");
             }
         }
         return object;
@@ -161,7 +163,6 @@ _Deserializer_buffer = new WeakMap(), _Deserializer_index = new WeakMap(), _Dese
         return value;
     }
     else {
-        throw new TypeError("Don't know how to deserialize type (received " + type + ")");
     }
 }, _Deserializer_typeFrom = function _Deserializer_typeFrom(code) {
     const types = constants_1.BSONXTypes;

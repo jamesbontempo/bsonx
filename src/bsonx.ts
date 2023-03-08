@@ -1,9 +1,9 @@
 import { Buffer } from "node:buffer";
 import { primitive, array, error, allowable } from "./types";
 import { BSONXTypes, PRIMITIVES, ARRAYS, ERRORS } from "./constants"
-import { isPrimitive, isArray, isError, isString, isSymbol, isSet, isMap, isObject, typeOf } from "./utils";
+import { isPrimitive, isArray, isError, isString, isSet, isMap, isObject, typeOf, isAllowable } from "./utils";
 
-export function serialize(item: any): Buffer {
+export function serialize(item: allowable): Buffer {
     return new Serializer().serialize(item);
 }
 
@@ -13,6 +13,7 @@ export class Serializer {
 
     serialize(item: allowable): Buffer {
         const type: string = typeOf(item);
+        if (!isAllowable(item)) throw new TypeError("Don't know how to serialize type (received \"" + type + "\")");
         const typeBuffer: Buffer = Buffer.from([BSONXTypes[type].code]);
         const sizeBuffer: Buffer = Buffer.alloc(4);
         let dataBuffer: Uint8Array = new Uint8Array();
@@ -47,8 +48,6 @@ export class Serializer {
         } else if (isPrimitive(item)) {
             dataBuffer = Buffer.concat([dataBuffer, this.#toBuffer(type, item)]);
             sizeBuffer.writeUInt32LE(dataBuffer.length);
-        } else {
-            throw new TypeError("Don't know how to serialize type (received " + type + ")");
         }
         return Buffer.concat([typeBuffer, sizeBuffer, dataBuffer]);
     }
@@ -89,7 +88,9 @@ export class Deserializer {
     }
 
     #deserialize(): allowable {
-        const type: string = this.#typeFrom(this.#buffer[this.#index]);
+        const code: number = this.#buffer[this.#index];
+        const type: string = this.#typeFrom(code);
+        if (type === "unknown") throw new TypeError("Don't know how to deserialize type (received " + code + ")");
         const size = this.#buffer.readInt32LE(this.#index + 1);
         this.#index += 5;
         if (ARRAYS.includes(type)) {
@@ -113,14 +114,14 @@ export class Deserializer {
             }
             return map;
         } else if (type === "object") {
-            const object: Record<string | symbol, any> = new Object();
+            const object: Record<string, any> = new Object();
             for (let i = 0; i < size; i++) {
                 const key = this.#deserialize();
                 const value = this.#deserialize();
-                if (isString(key) || isSymbol(key)) {
+                if (isString(key)) {
                     object[key] = value;
                 } else {
-                    throw new TypeError("Oject property names can only be strings or symbols (received " + typeOf(key) + ")");
+                    throw new TypeError("Oject property names can only be strings (received " + typeOf(key) + ")");
                 }
             }
             return object;
@@ -135,7 +136,7 @@ export class Deserializer {
             this.#index = end;
             return value
         } else {
-            throw new TypeError("Don't know how to deserialize type (received " + type + ")");
+            
         }
     }
 

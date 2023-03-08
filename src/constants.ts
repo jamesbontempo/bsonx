@@ -1,5 +1,3 @@
-import { BSONX } from ".";
-
 export const BSONXTypes: Record<string, Record<string, any>> = Object.freeze({
     "array": {code: 1, type: "array"},
     "bigint": {code: 2, type: "primitive"},

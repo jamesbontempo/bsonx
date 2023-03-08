@@ -1,6 +1,10 @@
 import { primitive, array, error, allowable } from "./types";
 import { BSONXTypes } from "./constants"
 
+export function isAllowable(item: any): item is allowable {
+    return BSONXTypes[typeOf(item)] !== undefined;
+}
+
 export function isPrimitive(item: allowable): item is primitive {
     return BSONXTypes[typeOf(item)].type === "primitive";
 }
@@ -15,10 +19,6 @@ export function isError(item: allowable): item is error {
 
 export function isString(item: allowable): item is string {
     return typeOf(item) === "string";
-}
-
-export function isSymbol(item: allowable): item is symbol {
-    return typeOf(item) === "symbol";
 }
 
 export function isObject(item: allowable): item is object {
