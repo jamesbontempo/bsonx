@@ -104,3 +104,15 @@ Returns the original item as a native JavaScript object.
  - UInt8ClampedArray
  - undefined
  - URIError
+
+ ## Drop-in `bson` replacement
+
+ `bsonx` does not implment the entire `bson` interface, only the `serialize` and `deserialize` methods. However, if that's all you're using `bson` for, you can use `bsonx` as a drop-in replacement and start serializing a wider range of objects:
+
+ ```js
+ import { BSONX as BSON } from "bsonx";
+ ```
+ ... or ...
+ ```js
+ const { BSONX: BSON } = require("bsonx");
+ ```
