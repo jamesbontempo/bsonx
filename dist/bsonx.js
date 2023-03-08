@@ -70,111 +70,194 @@ const ERRORS = [
     "typeerror",
     "urierror",
 ];
-const bson_1 = require("bson");
+const node_buffer_1 = require("node:buffer");
+let buffer;
+let index;
 function serialize(item) {
-    return bson_1.BSON.serialize(objectify(item));
+    return s(item);
 }
 exports.serialize = serialize;
 function deserialize(item) {
-    return deobjectify(bson_1.BSON.deserialize(item));
+    buffer = node_buffer_1.Buffer.from(item);
+    index = 0;
+    return d();
 }
 exports.deserialize = deserialize;
-function objectify(item) {
+function s(item) {
     const type = typeOf(item);
-    const object = {};
-    object["type"] = BSONXTypes[type];
-    object["data"] = [];
+    const typeBuffer = node_buffer_1.Buffer.from([BSONXTypes[type]]);
+    const sizeBuffer = node_buffer_1.Buffer.alloc(4);
+    let dataBuffer = new Uint8Array();
     if (isArray(type)) {
         const size = item.length;
-        object["size"] = size;
+        sizeBuffer.writeUInt32LE(size);
         for (let i = 0; i < size; i++) {
-            object["data"].push(objectify(item[i]));
+            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(item[i])]);
         }
     }
     else if (type === "set") {
-        object["size"] = item.size;
+        const size = item.size;
+        sizeBuffer.writeUInt32LE(size);
         item.forEach((value) => {
-            object["data"].push(objectify(value));
+            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(value)]);
         });
     }
     else if (type === "map") {
-        object["size"] = item.size;
+        const size = item.size;
+        sizeBuffer.writeUInt32LE(size);
         item.forEach((value, key) => {
-            object["data"].push([objectify(key), objectify(value)]);
+            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(key), s(value)]);
         });
     }
     else if (type === "object") {
-        object["size"] = 0;
+        let size = 0;
         for (const [key, value] of Object.entries(item)) {
-            object["data"].push([objectify(key), objectify(value)]);
-            object["size"]++;
+            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(key), s(value)]);
+            size++;
         }
+        sizeBuffer.writeUInt32LE(size);
     }
     else if (isPrimitive(type)) {
-        if (type === "symbol") {
-            const matches = /^Symbol\((.*)\)$/.exec(toString(item));
-            object["data"] = (matches) ? matches[1] : undefined;
-        }
-        else {
-            object["data"] = toString(item);
-        }
+        dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, toBuffer(type, item)]);
+        sizeBuffer.writeUInt32LE(dataBuffer.length);
     }
     else if (isError(type)) {
-        object["data"] = item.message;
+        dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, toBuffer("string", item.message)]);
+        sizeBuffer.writeUInt32LE(dataBuffer.length);
     }
     else {
         throw new TypeError("Don't know how to serialize type: " + type);
     }
-    return object;
+    return node_buffer_1.Buffer.concat([typeBuffer, sizeBuffer, dataBuffer]);
 }
-function deobjectify(item) {
-    const type = keyOf(BSONXTypes, item["type"]);
+function d() {
+    const type = keyOf(BSONXTypes, buffer[index]);
+    const size = buffer.readInt32LE(index + 1);
+    index += 5;
     if (isArray(type)) {
-        const size = item["size"];
-        const array = newArray(type, item["size"]);
+        const array = newArray(type, size);
         for (let i = 0; i < size; i++) {
-            const value = deobjectify(item["data"][i]);
-            array[i] = value;
+            array[i] = d();
         }
         return array;
     }
     else if (type === "set") {
-        const size = item["size"];
         const set = new Set();
         for (let i = 0; i < size; i++) {
-            const value = deobjectify(item["data"][i]);
-            set.add(value);
+            set.add(d());
         }
         return set;
     }
     else if (type === "map") {
-        const size = item["size"];
         const map = new Map();
         for (let i = 0; i < size; i++) {
-            const key = deobjectify(item["data"][i][0]);
-            const value = deobjectify(item["data"][i][1]);
+            const key = d();
+            const value = d();
             map.set(key, value);
         }
         return map;
     }
     else if (type === "object") {
-        const size = item["size"];
         const object = new Object();
         for (let i = 0; i < size; i++) {
-            const key = deobjectify(item["data"][i][0]);
-            const value = deobjectify(item["data"][i][1]);
+            const key = d();
+            const value = d();
             object[key] = value;
         }
         return object;
     }
     else if (isPrimitive(type)) {
-        return toPrimitive(item);
+        switch (type) {
+            case "null":
+                return null;
+            case "undefined":
+                return undefined;
+            default:
+                const value = newPrimitive(type, buffer.subarray(index, index + size));
+                index += size;
+                return value;
+        }
     }
     else if (isError(type)) {
-        return toError(item);
+        const value = newError(type, buffer.subarray(index, index + size));
+        index += size;
+        return value;
     }
     else {
         throw new TypeError("Don't know how to deserialize type: " + type);
+    }
+}
+function typeOf(item) {
+    let type = typeof item;
+    if (type !== "object") {
+        return type;
+    }
+    else if (item === null) {
+        return "null";
+    }
+    else {
+        type = Object.prototype.toString.call(item).slice(8, -1).toLowerCase();
+        if (type === "error") {
+            return item.name.toLowerCase();
+        }
+        else {
+            return type;
+        }
+    }
+}
+function keyOf(object, value) {
+    const key = Object.keys(object).find((key) => object[key] === value);
+    return key || "unknown";
+}
+function isPrimitive(type) {
+    return PRIMITIVES.includes(type);
+}
+function isArray(type) {
+    return ARRAYS.includes(type);
+}
+function isError(type) {
+    return ERRORS.includes(type);
+}
+function toBuffer(type, item) {
+    switch (type) {
+        case "boolean":
+            return (item === true) ? new Uint8Array([1]) : new Uint8Array([0]);
+        case "date":
+            return node_buffer_1.Buffer.from(item.toISOString());
+        case "null":
+            return new Uint8Array([0]);
+        case "symbol":
+            const matches = /^Symbol\((.*)\)$/.exec(item.toString());
+            return (matches) ? node_buffer_1.Buffer.from(matches[1]) : new Uint8Array([0]);
+        case "undefined":
+            return new Uint8Array([0]);
+        default:
+            return node_buffer_1.Buffer.from(item.toString());
+    }
+}
+function newPrimitive(type, buffer) {
+    if (type === "boolean") {
+        return (buffer[0]) ? true : false;
+    }
+    else {
+        const data = buffer.toString();
+        switch (type) {
+            case "bigint":
+                return BigInt(data);
+            case "date":
+                return new Date(data);
+            case "function":
+                return new Function("return " + data)();
+            case "number":
+                return Number(data);
+            case "regexp":
+                const matches = /^\/(.*)\/(.*)$/.exec(data);
+                return (matches) ? new RegExp(matches[1], matches[2]) : undefined;
+            case "string":
+                return data;
+            case "symbol":
+                return Symbol.for(data);
+        }
     }
 }
 function newArray(type, size) {
@@ -205,94 +288,23 @@ function newArray(type, size) {
             return new Array(size);
     }
 }
-function toPrimitive(item) {
-    const type = keyOf(BSONXTypes, item["type"]);
-    const data = item["data"];
-    switch (type) {
-        case "bigint":
-            return BigInt(data);
-        case "boolean":
-            return (data === "true") ? true : false;
-        case "date":
-            return new Date(data);
-        case "function":
-            return new Function("return " + data)();
-        case "number":
-            return Number(data);
-        case "null":
-            return null;
-        case "regexp":
-            const matches = /^\/(.*)\/(.*)$/.exec(data);
-            return (matches) ? new RegExp(matches[1], matches[2]) : undefined;
-        case "string":
-            return data;
-        case "symbol":
-            return Symbol.for(data);
-        case "undefined":
-            return undefined;
-    }
-}
-function toError(item) {
-    const type = keyOf(BSONXTypes, item["type"]);
-    const data = item["data"];
+function newError(type, buffer) {
+    const message = buffer.toString();
     switch (type) {
         case "evalerror":
-            return new EvalError(data);
+            return new EvalError(message);
         case "rangeerror":
-            return new RangeError(data);
+            return new RangeError(message);
         case "referenceerror":
-            return new ReferenceError(data);
+            return new ReferenceError(message);
         case "syntaxerror":
-            return new SyntaxError(data);
+            return new SyntaxError(message);
         case "typeerror":
-            return new TypeError(data);
+            return new TypeError(message);
         case "urierror":
-            return new URIError(data);
+            return new URIError(message);
         default:
-            return new Error(data);
-    }
-}
-function isPrimitive(type) {
-    return PRIMITIVES.includes(type);
-}
-function isArray(type) {
-    return ARRAYS.includes(type);
-}
-function isError(type) {
-    return ERRORS.includes(type);
-}
-function typeOf(item) {
-    let type = typeof item;
-    if (type !== "object") {
-        return type;
-    }
-    else if (item === null) {
-        return "null";
-    }
-    else {
-        type = Object.prototype.toString.call(item).slice(8, -1).toLowerCase();
-        if (type === "error") {
-            return item.name.toLowerCase();
-        }
-        else {
-            return type;
-        }
-    }
-}
-function keyOf(object, value) {
-    const key = Object.keys(object).find((key) => object[key] === value);
-    return key || "unknown";
-}
-function toString(item) {
-    switch (typeOf(item)) {
-        case "date":
-            return item.toISOString();
-        case "null":
-            return "null";
-        case "undefined":
-            return "undefined";
-        default:
-            return item.toString();
+            return new Error(message);
     }
 }
 //# sourceMappingURL=bsonx.js.map

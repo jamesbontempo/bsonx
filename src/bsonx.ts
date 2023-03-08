@@ -71,16 +71,7 @@ const ERRORS = [
     "urierror",
 ];
 
-import { BSON } from "bson";
-
-
-export function serialize(item: any): Uint8Array {
-    return BSON.serialize(objectify(item));
-}
-
-export function deserialize(item: Uint8Array): any {
-    return deobjectify(BSON.deserialize(item));
-}
+import { Buffer } from "node:buffer";
 
 type primitive = bigint|boolean|Date|Function|number|null|RegExp|string|symbol|undefined;
 
@@ -88,90 +79,187 @@ type array = Array<any>|BigInt64Array|BigUint64Array|Float32Array|Float64Array|I
 
 type error = Error|EvalError|RangeError|ReferenceError|SyntaxError|TypeError|URIError;
 
-function objectify(item: any) {
+let buffer: Buffer;
+let index: number;
+
+export function serialize(item: any): Buffer {
+    return s(item);
+}
+
+export function deserialize(item: Uint8Array): any {
+    buffer = Buffer.from(item);
+    index = 0;
+    return d();
+}
+
+function s(item: any): Buffer {
     const type: string = typeOf(item);
-    const object: Record<string, any> = {};
-    object["type"] = BSONXTypes[type];
-    object["data"] = [];
+    const typeBuffer: Buffer = Buffer.from([BSONXTypes[type]]);
+    const sizeBuffer: Buffer = Buffer.alloc(4);
+    let dataBuffer: Uint8Array = new Uint8Array();
     if (isArray(type)) {
         const size: number = item.length;
-        object["size"] = size;
+        sizeBuffer.writeUInt32LE(size);
         for (let i = 0; i < size; i++) {
-            object["data"].push(objectify(item[i]));
+            dataBuffer = Buffer.concat([dataBuffer, s(item[i])]);
         }
     } else if (type === "set") {
-        object["size"] = item.size;
+        const size: number = item.size;
+        sizeBuffer.writeUInt32LE(size);
         item.forEach((value: any) => {
-            object["data"].push(objectify(value));
+            dataBuffer = Buffer.concat([dataBuffer, s(value)]);
         });
     } else if (type === "map") {
-        object["size"] = item.size;
+        const size: number = item.size;
+        sizeBuffer.writeUInt32LE(size);
         item.forEach((value: any, key: any) => {
-            object["data"].push([objectify(key), objectify(value)]);
+            dataBuffer = Buffer.concat([dataBuffer, s(key), s(value)]);
         });
     } else if (type === "object") {
-        object["size"] = 0;
+        let size: number = 0;
         for (const [key, value] of Object.entries(item)) {
-            object["data"].push([objectify(key), objectify(value)]);
-            object["size"]++;
+            dataBuffer = Buffer.concat([dataBuffer, s(key), s(value)]);
+            size++;
         }
+        sizeBuffer.writeUInt32LE(size);
     } else if (isPrimitive(type)) {
-        if (type === "symbol") {
-            const matches: RegExpMatchArray|null = /^Symbol\((.*)\)$/.exec(toString(item));
-            object["data"] = (matches) ? matches[1] : undefined;
-        } else {
-            object["data"] = toString(item);
-        }
+        dataBuffer = Buffer.concat([dataBuffer, toBuffer(type, item)]);
+        sizeBuffer.writeUInt32LE(dataBuffer.length);
     } else if (isError(type)) {
-        object["data"] = item.message;
+        dataBuffer = Buffer.concat([dataBuffer, toBuffer("string", item.message)]);
+        sizeBuffer.writeUInt32LE(dataBuffer.length);
     } else {
         throw new TypeError("Don't know how to serialize type: " + type);
     }
-    return object;
+    return Buffer.concat([typeBuffer, sizeBuffer, dataBuffer]);
 }
 
-function deobjectify(item: Record<string, any>): any {
-    const type: string = keyOf(BSONXTypes, item["type"]);
+function d(): any {
+    const type: string = keyOf(BSONXTypes, buffer[index]);
+    const size = buffer.readInt32LE(index + 1);
+    index += 5;
     if (isArray(type)) {
-        const size: number = item["size"];
-        const array: array = newArray(type, item["size"]);
+        const array: array = newArray(type, size);
         for (let i = 0; i < size; i++) {
-            const value = deobjectify(item["data"][i]);
-            array[i] = value;
+            array[i] = d();
         }
         return array;
     } else if (type === "set") {
-        const size: number = item["size"];
         const set: Set<any> = new Set();
         for (let i = 0; i < size; i++) {
-            const value = deobjectify(item["data"][i]);
-            set.add(value);
+            set.add(d());
         }
         return set;
     } else if (type === "map") {
-        const size: number = item["size"];
         const map: Map<any, any> = new Map();
         for (let i = 0; i < size; i++) {
-            const key = deobjectify(item["data"][i][0]);
-            const value = deobjectify(item["data"][i][1]);
+            const key = d();
+            const value = d();
             map.set(key, value);
         }
         return map;
     } else if (type === "object") {
-        const size: number = item["size"];
         const object: Record<string, any> = new Object();
         for (let i = 0; i < size; i++) {
-            const key = deobjectify(item["data"][i][0]);
-            const value = deobjectify(item["data"][i][1]);
+            const key = d();
+            const value = d();
             object[key] = value;
         }
         return object;
     } else if (isPrimitive(type)) {
-        return toPrimitive(item);
+        switch (type) {
+            case "null":
+                return null;
+            case "undefined":
+                return undefined;
+            default:
+                const value: any = newPrimitive(type, buffer.subarray(index, index + size));
+                index += size;
+                return value
+        }
     } else if (isError(type)) {
-        return toError(item);
+        const value: any = newError(type, buffer.subarray(index, index + size));
+        index += size;
+        return value
     } else {
         throw new TypeError("Don't know how to deserialize type: " + type);
+    }
+}
+
+function typeOf(item: any): string {
+    let type: string = typeof item;
+    if (type !== "object") {
+        return type;
+    } else if (item === null) {
+        return "null";
+    } else {
+        type = Object.prototype.toString.call(item).slice(8,-1).toLowerCase();
+        if (type === "error") {
+            return item.name.toLowerCase();
+        } else {
+            return type;
+        }
+    }
+}
+
+function keyOf(object: Record<string, any>, value: any): string {
+    const key: string|undefined = Object.keys(object).find((key) => object[key] === value);
+    return key || "unknown";
+}
+
+function isPrimitive(type: string): boolean {
+    return PRIMITIVES.includes(type);
+}
+
+function isArray(type: string): boolean {
+    return ARRAYS.includes(type);
+}
+
+function isError(type: string): boolean {
+    return ERRORS.includes(type);
+}
+
+function toBuffer(type: string, item: any): Buffer|Uint8Array {
+    switch(type) {
+        case "boolean":
+            return (item === true) ? new Uint8Array([1]) : new Uint8Array([0]);
+        case "date":
+            return Buffer.from(item.toISOString());
+        case "null":
+            return new Uint8Array([0]);
+        case "symbol":
+            const matches: RegExpMatchArray|null = /^Symbol\((.*)\)$/.exec(item.toString());
+            return (matches) ? Buffer.from(matches[1]) : new Uint8Array([0]);
+        case "undefined":
+            return new Uint8Array([0]);
+        default:
+            return Buffer.from(item.toString());
+    }
+}
+
+function newPrimitive(type: string, buffer: Uint8Array): primitive {
+    if (type === "boolean") {
+        return (buffer[0]) ? true : false
+    } else {
+        const data: string = buffer.toString();
+        switch(type) {
+            case "bigint":
+                return BigInt(data);
+            case "date":
+                return new Date(data);
+            case "function":
+                return new Function("return " + data)();
+            case "number":
+                return Number(data);
+            case "regexp":
+                const matches = /^\/(.*)\/(.*)$/.exec(data);
+                return (matches) ? new RegExp(matches[1], matches[2]) : undefined;
+            case "string":
+                return data;
+            case "symbol":
+                return Symbol.for(data);
+
+        }
     }
 }
 
@@ -204,97 +292,22 @@ function newArray(type: string, size: number): array {
     }
 }
 
-function toPrimitive(item: Record<string, primitive>): primitive {
-    const type: string = keyOf(BSONXTypes, item["type"]);
-    const data: any = item["data"];
-    switch(type) {
-        case "bigint":
-            return BigInt(data);
-        case "boolean":
-            return (data === "true") ? true : false;
-        case "date":
-            return new Date(data);
-        case "function":
-            return new Function("return " + data)();
-        case "number":
-            return Number(data);
-        case "null":
-            return null;
-        case "regexp":
-            const matches = /^\/(.*)\/(.*)$/.exec(data);
-            return (matches) ? new RegExp(matches[1], matches[2]) : undefined;
-        case "string":
-            return data;
-        case "symbol":
-            return Symbol.for(data);
-        case "undefined":
-            return undefined;
-    }
-}
-
-function toError(item: Record<string, number|string>): error {
-    const type: string = keyOf(BSONXTypes, item["type"]);
-    const data: any = item["data"];
-    switch(type) {
+function newError(type: string, buffer: Uint8Array): error {
+    const message: string = buffer.toString();
+    switch (type) {
         case "evalerror":
-            return new EvalError(data);
+            return new EvalError(message);
         case "rangeerror":
-            return new RangeError(data);
+            return new RangeError(message);
         case "referenceerror":
-            return new ReferenceError(data);
+            return new ReferenceError(message);
         case "syntaxerror":
-            return new SyntaxError(data);
+            return new SyntaxError(message);
         case "typeerror":
-            return new TypeError(data);
+            return new TypeError(message);
         case "urierror":
-            return new URIError(data);
+            return new URIError(message);
         default:
-            return new Error(data);
-    }
-}
-
-function isPrimitive(type: string): boolean {
-    return PRIMITIVES.includes(type);
-}
-
-function isArray(type: string): boolean {
-    return ARRAYS.includes(type);
-}
-
-function isError(type: string): boolean {
-    return ERRORS.includes(type);
-}
-
-function typeOf(item: any): string {
-    let type: string = typeof item;
-    if (type !== "object") {
-        return type;
-    } else if (item === null) {
-        return "null";
-    } else {
-        type = Object.prototype.toString.call(item).slice(8,-1).toLowerCase();
-        if (type === "error") {
-            return item.name.toLowerCase();
-        } else {
-            return type;
-        }
-    }
-}
-
-function keyOf(object: Record<string, any>, value: any): string {
-    const key: string|undefined = Object.keys(object).find((key) => object[key] === value);
-    return key || "unknown";
-}
-
-function toString(item: any): string {
-    switch (typeOf(item)) {
-        case "date":
-            return item.toISOString();
-        case "null":
-            return "null";
-        case "undefined":
-            return "undefined";
-        default:
-            return item.toString();
+            return new Error(message);
     }
 }

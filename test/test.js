@@ -19,7 +19,7 @@ describe("Primitives", () => {
         expect(output).to.be.true;
     });
 
-    it("Boolean (true)", () => {
+    it("Boolean (false)", () => {
         const input = false;
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.be.false;
@@ -32,16 +32,9 @@ describe("Primitives", () => {
     });
 
     it("Function", () => {
-        const input = (name) => { return "Hello " + name + "!"; };
+        const input = (world) => { return "Hello " + world + "!"; };
         const output = BSONX.deserialize(BSONX.serialize(input));
-        expect(output("James")).to.equal("Hello James!");
-    });
-
-    it("Map", () => {
-        const input = new Map([[1, "one"], [2, false]]);
-        const output = BSONX.deserialize(BSONX.serialize(input));
-        expect(output).to.deep.equal(input);
-        expect(output.get(1)).to.equal("one");
+        expect(output("world")).to.equal("Hello world!");
     });
 
     it("Null", () => {
@@ -56,25 +49,11 @@ describe("Primitives", () => {
         expect(output).to.equal(input);
     });
 
-    it("Object", () => {
-        const input = {id: 1, array: [13, 17, "fifty"], set: new Map([[1, ["one", "uno"]], [2, "two"]])};
-        const output = BSONX.deserialize(BSONX.serialize(input));
-        expect(output).to.deep.equal(input);
-        expect(output.set.get(1)[1]).to.equal("uno");
-    });
-
     it("RegExp", () => {
         const input = /^\((.*)\)$/g;
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.deep.equal(input);
         expect(output.exec("(BSONX)")[1]).to.equal("BSONX");
-    });
-
-    it("Set", () => {
-        const input = new Set([1, 2, 3]);
-        const output = BSONX.deserialize(BSONX.serialize(input));
-        expect(output).to.deep.equal(input);
-        expect(output.has(1)).to.equal(true);
     });
 
     it("String", () => {
@@ -86,7 +65,7 @@ describe("Primitives", () => {
     it("Symbol", () => {
         const input = Symbol("test");
         const output = BSONX.deserialize(BSONX.serialize(input));
-        expect(BSONX.deserialize(BSONX.serialize(input)).toString()).to.equal(input.toString());
+        expect(output.toString()).to.equal(input.toString());
     });
 
     it("Undefined", () => {
@@ -106,13 +85,13 @@ describe("Arrays", () => {
     });
 
     it("BigInt64Array", () => {
-        const input = new BigInt64Array([(-1 * Math.pow(2, 63)).toString()]);
+        const input = new BigInt64Array([-9223372036854775808n, -9223372036854775807n]);
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.deep.equal(input);
     });
 
     it("BigUInt64Array", () => {
-        const input = new BigUint64Array([(Math.pow(2, 64) - 1).toString()]);
+        const input = new BigUint64Array([18446744073709551615n, 18446744073709551614n, 18446744073709551613n]);
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.deep.equal(input);
     });
@@ -176,6 +155,32 @@ describe("Arrays", () => {
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.deep.equal(input);
         expect(output[0]).to.equal(255);
+    });
+
+});
+
+describe("Collections", () => {
+
+    it("Map", () => {
+        const input = new Map([[1, "one"], [2, false]]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.get(1)).to.equal("one");
+    });
+
+    it("Object", () => {
+        const input = {id: 1, array: [13, 17, "fifty", new Set(["a", "b", "c"])], map: new Map([[1, ["one", "uno"]], [[2], "two"]])};
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.array[3].has("a")).to.be.true;
+        expect(output.map.get(1)[1]).to.equal("uno");
+    });
+
+    it("Set", () => {
+        const input = new Set([1, 2, 3]);
+        const output = BSONX.deserialize(BSONX.serialize(input));
+        expect(output).to.deep.equal(input);
+        expect(output.has(1)).to.equal(true);
     });
 
 });
@@ -245,7 +250,7 @@ describe("Failures", () => {
     });
 
     it("Unknown (deserialze)", () => {
-        const input = BSON.serialize({type: "foo", value: "bar"});
+        const input = Buffer.from("12000000ff0100000017020000006964050100000001", "hex")
         let e = null;
         try {
             BSONX.deserialize(input);
@@ -255,5 +260,3 @@ describe("Failures", () => {
     });
 
 });
-
-BSONX.deserialize(BSONX.serialize(new Error("Test")));
