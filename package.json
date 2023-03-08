@@ -17,10 +17,18 @@
     "deserialize",
     "binary",
     "data",
-    "exchange"
+    "exchange",
+    "bson"
   ],
-  "author": "James BonTempo",
+  "author": {
+    "name": "James BonTempo",
+    "email": "jamesbontempo@gmail.com"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jamesbontempo/bsonx"
+  },
   "devDependencies": {
     "@tsconfig/node14": "^1.0.3",
     "@types/node": "^18.14.6",
