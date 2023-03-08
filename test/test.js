@@ -1,4 +1,3 @@
-const { BSON } = require("bson");
 const { BSONX } = require("../dist/index");
 
 const expect = require("chai").expect;
@@ -169,7 +168,7 @@ describe("Collections", () => {
     });
 
     it("Object", () => {
-        const input = {id: 1, array: [13, 17, "fifty", new Set(["a", "b", "c"])], map: new Map([[1, ["one", "uno"]], [[2], "two"]])};
+        const input = {id: 1, array: [13, 17, "fifty", new Set(["a", "b", "c"])], map: new Map([[1, ["one", "uno"]], [[2], "two"]]), now: Date.now()};
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.deep.equal(input);
         expect(output.array[3].has("a")).to.be.true;
