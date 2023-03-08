@@ -1,224 +1,79 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.deserialize = exports.serialize = void 0;
-const BSONXTypes = {
-    "array": 1,
-    "bigint": 2,
-    "bigint64array": 3,
-    "biguint64array": 4,
-    "boolean": 5,
-    "date": 6,
-    "error": 7,
-    "evalerror": 8,
-    "float32array": 9,
-    "float64array": 10,
-    "function": 11,
-    "int8array": 12,
-    "int16array": 13,
-    "int32array": 14,
-    "map": 15,
-    "null": 16,
-    "number": 17,
-    "object": 18,
-    "rangeerror": 19,
-    "referenceerror": 20,
-    "regexp": 21,
-    "set": 22,
-    "string": 23,
-    "symbol": 24,
-    "syntaxerror": 25,
-    "typeerror": 26,
-    "uint8array": 27,
-    "uint16array": 28,
-    "uint32array": 29,
-    "uint8clampedarray": 30,
-    "undefined": 31,
-    "urierror": 32
+var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-const PRIMITIVES = [
-    "bigint",
-    "boolean",
-    "date",
-    "function",
-    "number",
-    "null",
-    "regexp",
-    "string",
-    "symbol",
-    "undefined"
-];
-const ARRAYS = [
-    "array",
-    "bigint64array",
-    "biguint64array",
-    "float32array",
-    "float64array",
-    "int8array",
-    "int16array",
-    "int32array",
-    "uint8array",
-    "uint16array",
-    "uint32array",
-    "uint8clampedarray"
-];
-const ERRORS = [
-    "error",
-    "evalerror",
-    "rangeerror",
-    "referenceerror",
-    "syntaxerror",
-    "typeerror",
-    "urierror",
-];
+var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+};
+var _Serializer_instances, _Serializer_toBuffer, _Deserializer_instances, _Deserializer_buffer, _Deserializer_index, _Deserializer_deserialize, _Deserializer_typeFrom, _Deserializer_newPrimitive, _Deserializer_newArray, _Deserializer_newError;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Deserializer = exports.deserialize = exports.Serializer = exports.serialize = void 0;
 const node_buffer_1 = require("node:buffer");
-let buffer;
-let index;
+const constants_1 = require("./constants");
+const utils_1 = require("./utils");
 function serialize(item) {
-    return s(item);
+    return new Serializer().serialize(item);
 }
 exports.serialize = serialize;
-function deserialize(item) {
-    buffer = node_buffer_1.Buffer.from(item);
-    index = 0;
-    return d();
-}
-exports.deserialize = deserialize;
-function s(item) {
-    const type = typeOf(item);
-    const typeBuffer = node_buffer_1.Buffer.from([BSONXTypes[type]]);
-    const sizeBuffer = node_buffer_1.Buffer.alloc(4);
-    let dataBuffer = new Uint8Array();
-    if (isArray(type)) {
-        const size = item.length;
-        sizeBuffer.writeUInt32LE(size);
-        for (let i = 0; i < size; i++) {
-            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(item[i])]);
+class Serializer {
+    constructor() {
+        _Serializer_instances.add(this);
+    }
+    serialize(item) {
+        const type = (0, utils_1.typeOf)(item);
+        const typeBuffer = node_buffer_1.Buffer.from([constants_1.BSONXTypes[type].code]);
+        const sizeBuffer = node_buffer_1.Buffer.alloc(4);
+        let dataBuffer = new Uint8Array();
+        if ((0, utils_1.isArray)(item)) {
+            const size = item.length;
+            sizeBuffer.writeUInt32LE(size);
+            for (let i = 0; i < size; i++) {
+                dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, this.serialize(item[i])]);
+            }
         }
-    }
-    else if (type === "set") {
-        const size = item.size;
-        sizeBuffer.writeUInt32LE(size);
-        item.forEach((value) => {
-            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(value)]);
-        });
-    }
-    else if (type === "map") {
-        const size = item.size;
-        sizeBuffer.writeUInt32LE(size);
-        item.forEach((value, key) => {
-            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(key), s(value)]);
-        });
-    }
-    else if (type === "object") {
-        let size = 0;
-        for (const [key, value] of Object.entries(item)) {
-            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, s(key), s(value)]);
-            size++;
+        else if ((0, utils_1.isSet)(item)) {
+            const size = item.size;
+            sizeBuffer.writeUInt32LE(size);
+            item.forEach((value) => {
+                dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, this.serialize(value)]);
+            });
         }
-        sizeBuffer.writeUInt32LE(size);
-    }
-    else if (isPrimitive(type)) {
-        dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, toBuffer(type, item)]);
-        sizeBuffer.writeUInt32LE(dataBuffer.length);
-    }
-    else if (isError(type)) {
-        dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, toBuffer("string", item.message)]);
-        sizeBuffer.writeUInt32LE(dataBuffer.length);
-    }
-    else {
-        throw new TypeError("Don't know how to serialize type: " + type);
-    }
-    return node_buffer_1.Buffer.concat([typeBuffer, sizeBuffer, dataBuffer]);
-}
-function d() {
-    const type = keyOf(BSONXTypes, buffer[index]);
-    const size = buffer.readInt32LE(index + 1);
-    index += 5;
-    if (isArray(type)) {
-        const array = newArray(type, size);
-        for (let i = 0; i < size; i++) {
-            array[i] = d();
+        else if ((0, utils_1.isMap)(item)) {
+            const size = item.size;
+            sizeBuffer.writeUInt32LE(size);
+            item.forEach((value, key) => {
+                dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, this.serialize(key), this.serialize(value)]);
+            });
         }
-        return array;
-    }
-    else if (type === "set") {
-        const set = new Set();
-        for (let i = 0; i < size; i++) {
-            set.add(d());
+        else if ((0, utils_1.isObject)(item)) {
+            let size = 0;
+            for (const [key, value] of Object.entries(item)) {
+                dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, this.serialize(key), this.serialize(value)]);
+                size++;
+            }
+            sizeBuffer.writeUInt32LE(size);
         }
-        return set;
-    }
-    else if (type === "map") {
-        const map = new Map();
-        for (let i = 0; i < size; i++) {
-            const key = d();
-            const value = d();
-            map.set(key, value);
+        else if ((0, utils_1.isError)(item)) {
+            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, __classPrivateFieldGet(this, _Serializer_instances, "m", _Serializer_toBuffer).call(this, "string", item.message)]);
+            sizeBuffer.writeUInt32LE(dataBuffer.length);
         }
-        return map;
-    }
-    else if (type === "object") {
-        const object = new Object();
-        for (let i = 0; i < size; i++) {
-            const key = d();
-            const value = d();
-            object[key] = value;
-        }
-        return object;
-    }
-    else if (isPrimitive(type)) {
-        switch (type) {
-            case "null":
-                return null;
-            case "undefined":
-                return undefined;
-            default:
-                const value = newPrimitive(type, buffer.subarray(index, index + size));
-                index += size;
-                return value;
-        }
-    }
-    else if (isError(type)) {
-        const value = newError(type, buffer.subarray(index, index + size));
-        index += size;
-        return value;
-    }
-    else {
-        throw new TypeError("Don't know how to deserialize type: " + type);
-    }
-}
-function typeOf(item) {
-    let type = typeof item;
-    if (type !== "object") {
-        return type;
-    }
-    else if (item === null) {
-        return "null";
-    }
-    else {
-        type = Object.prototype.toString.call(item).slice(8, -1).toLowerCase();
-        if (type === "error") {
-            return item.name.toLowerCase();
+        else if ((0, utils_1.isPrimitive)(item)) {
+            dataBuffer = node_buffer_1.Buffer.concat([dataBuffer, __classPrivateFieldGet(this, _Serializer_instances, "m", _Serializer_toBuffer).call(this, type, item)]);
+            sizeBuffer.writeUInt32LE(dataBuffer.length);
         }
         else {
-            return type;
+            throw new TypeError("Don't know how to serialize type (received " + type + ")");
         }
+        return node_buffer_1.Buffer.concat([typeBuffer, sizeBuffer, dataBuffer]);
     }
 }
-function keyOf(object, value) {
-    const key = Object.keys(object).find((key) => object[key] === value);
-    return key || "unknown";
-}
-function isPrimitive(type) {
-    return PRIMITIVES.includes(type);
-}
-function isArray(type) {
-    return ARRAYS.includes(type);
-}
-function isError(type) {
-    return ERRORS.includes(type);
-}
-function toBuffer(type, item) {
+exports.Serializer = Serializer;
+_Serializer_instances = new WeakSet(), _Serializer_toBuffer = function _Serializer_toBuffer(type, item) {
     switch (type) {
         case "boolean":
             return (item === true) ? new Uint8Array([1]) : new Uint8Array([0]);
@@ -234,10 +89,93 @@ function toBuffer(type, item) {
         default:
             return node_buffer_1.Buffer.from(item.toString());
     }
+};
+function deserialize(uint8array) {
+    return new Deserializer().deserialize(uint8array);
 }
-function newPrimitive(type, buffer) {
+exports.deserialize = deserialize;
+class Deserializer {
+    constructor() {
+        _Deserializer_instances.add(this);
+        _Deserializer_buffer.set(this, node_buffer_1.Buffer.alloc(0));
+        _Deserializer_index.set(this, 0);
+    }
+    deserialize(uint8array) {
+        __classPrivateFieldSet(this, _Deserializer_buffer, node_buffer_1.Buffer.from(uint8array), "f");
+        __classPrivateFieldSet(this, _Deserializer_index, 0, "f");
+        return __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
+    }
+}
+exports.Deserializer = Deserializer;
+_Deserializer_buffer = new WeakMap(), _Deserializer_index = new WeakMap(), _Deserializer_instances = new WeakSet(), _Deserializer_deserialize = function _Deserializer_deserialize() {
+    const type = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_typeFrom).call(this, __classPrivateFieldGet(this, _Deserializer_buffer, "f")[__classPrivateFieldGet(this, _Deserializer_index, "f")]);
+    const size = __classPrivateFieldGet(this, _Deserializer_buffer, "f").readInt32LE(__classPrivateFieldGet(this, _Deserializer_index, "f") + 1);
+    __classPrivateFieldSet(this, _Deserializer_index, __classPrivateFieldGet(this, _Deserializer_index, "f") + 5, "f");
+    if (constants_1.ARRAYS.includes(type)) {
+        const array = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_newArray).call(this, type, size);
+        for (let i = 0; i < size; i++) {
+            array[i] = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
+        }
+        return array;
+    }
+    else if (type === "set") {
+        const set = new Set();
+        for (let i = 0; i < size; i++) {
+            set.add(__classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this));
+        }
+        return set;
+    }
+    else if (type === "map") {
+        const map = new Map();
+        for (let i = 0; i < size; i++) {
+            const key = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
+            const value = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
+            map.set(key, value);
+        }
+        return map;
+    }
+    else if (type === "object") {
+        const object = new Object();
+        for (let i = 0; i < size; i++) {
+            const key = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
+            const value = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_deserialize).call(this);
+            if ((0, utils_1.isString)(key) || (0, utils_1.isSymbol)(key)) {
+                object[key] = value;
+            }
+            else {
+                throw new TypeError("Oject property names can only be strings or symbols (received " + (0, utils_1.typeOf)(key) + ")");
+            }
+        }
+        return object;
+    }
+    else if (constants_1.ERRORS.includes(type)) {
+        const end = __classPrivateFieldGet(this, _Deserializer_index, "f") + size;
+        const value = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_newError).call(this, type, __classPrivateFieldGet(this, _Deserializer_buffer, "f").subarray(__classPrivateFieldGet(this, _Deserializer_index, "f"), end));
+        __classPrivateFieldSet(this, _Deserializer_index, end, "f");
+        return value;
+    }
+    else if (constants_1.PRIMITIVES.includes(type)) {
+        const end = __classPrivateFieldGet(this, _Deserializer_index, "f") + size;
+        const value = __classPrivateFieldGet(this, _Deserializer_instances, "m", _Deserializer_newPrimitive).call(this, type, __classPrivateFieldGet(this, _Deserializer_buffer, "f").subarray(__classPrivateFieldGet(this, _Deserializer_index, "f"), end));
+        __classPrivateFieldSet(this, _Deserializer_index, end, "f");
+        return value;
+    }
+    else {
+        throw new TypeError("Don't know how to deserialize type (received " + type + ")");
+    }
+}, _Deserializer_typeFrom = function _Deserializer_typeFrom(code) {
+    const types = constants_1.BSONXTypes;
+    const key = Object.keys(types).find((key) => types[key].code === code);
+    return key || "unknown";
+}, _Deserializer_newPrimitive = function _Deserializer_newPrimitive(type, buffer) {
     if (type === "boolean") {
         return (buffer[0]) ? true : false;
+    }
+    else if (type === "null") {
+        return null;
+    }
+    else if (type === "undefined") {
+        return undefined;
     }
     else {
         const data = buffer.toString();
@@ -259,8 +197,7 @@ function newPrimitive(type, buffer) {
                 return Symbol.for(data);
         }
     }
-}
-function newArray(type, size) {
+}, _Deserializer_newArray = function _Deserializer_newArray(type, size) {
     switch (type) {
         case "bigint64array":
             return new BigInt64Array(size);
@@ -287,8 +224,7 @@ function newArray(type, size) {
         default:
             return new Array(size);
     }
-}
-function newError(type, buffer) {
+}, _Deserializer_newError = function _Deserializer_newError(type, buffer) {
     const message = buffer.toString();
     switch (type) {
         case "evalerror":
@@ -306,5 +242,5 @@ function newError(type, buffer) {
         default:
             return new Error(message);
     }
-}
+};
 //# sourceMappingURL=bsonx.js.map

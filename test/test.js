@@ -2,8 +2,6 @@ const { BSONX } = require("../dist/index");
 
 const expect = require("chai").expect;
 
-const NOW = new Date();
-
 describe("Primitives", () => {
 
     it("BigInt", () => {
@@ -25,6 +23,7 @@ describe("Primitives", () => {
     });
 
     it("Date", () => {
+        const NOW = new Date();
         const input = NOW;
         const output = BSONX.deserialize(BSONX.serialize(input));
         expect(output).to.deep.equal(NOW);
