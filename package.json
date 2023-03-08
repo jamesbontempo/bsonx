@@ -1,5 +1,5 @@
 {
-  "name": "bsonx",
+  "name": "@jamesbontempo/bsonx",
   "version": "0.1.0",
   "description": "Extension of BSON for (de)serializing a wider range of types",
   "files": [
