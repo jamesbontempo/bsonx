@@ -1,6 +1,6 @@
 # bsonx
 
-`bsonx` is a serialization library, inspired by [bson](https://www.npmjs.com/package/bson), that handles a wider range of native JavaScript object types, including BigInts, Sets, and Maps---even `undefined` and Errors. In addition, `bsonx` does not require input to be a JSON object: it can just as easily serialize solitary items, like primitive values and Arrays.
+`bsonx` is a serialization library, inspired by [bson](https://www.npmjs.com/package/bson), that handles a wider range of native JavaScript object types, including BigInts, Sets, and Maps---even `undefined` and Errors. In addition, `bsonx` does not require input to be a JSON object: it can just as easily serialize solitary items, like primitive values and Arrays. And it can be used to create deep clones, too.
 
 The "x" equals "extra"!
 
@@ -39,6 +39,13 @@ const deserialized = BSONX.deserialize(serialized);
 // Map(2) { 1 => [ 'one', 'uno' ], 2 => [ 'two', 'dos' ] }
 ```
 
+Create a deep clone of a Map
+```js
+const map = new Map([[1, ["one", "uno"]], [2, ["two", "dos"]]]);
+const clone = BSONX.clone(map);
+// Map(2) { 1 => [ 'one', 'uno' ], 2 => [ 'two', 'dos' ] }
+```
+
 ## Methods
 
 ### serialize
@@ -68,6 +75,20 @@ Name|Type|Description
 `buffer`|buffer|The buffer produced by a previous call to `serialize`
 
 Returns the original item as a native JavaScript object.
+
+### clone
+
+`clone(item)`
+
+Craetes a deep clone of an item.
+
+Parameters:
+
+Name|Type|Description
+----|----|-----------
+`item`|any|Any item of an allowable type (see [Allowable types](#allowable-types))
+
+Returns a deep clone of the item.
 
 ## Allowable types
 
@@ -116,3 +137,9 @@ Returns the original item as a native JavaScript object.
  ```js
  const { BSONX: BSON } = require("@jamesbontempo/bsonx");
  ```
+
+ ## Change log
+
+ ### 0.2.0
+
+ - Added `clone` method

@@ -1,6 +1,6 @@
 {
   "name": "@jamesbontempo/bsonx",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Extension of BSON for (de)serializing a wider range of types",
   "files": [
     "dist"
@@ -18,7 +18,9 @@
     "binary",
     "data",
     "exchange",
-    "bson"
+    "bson",
+    "deep",
+    "clone"
   ],
   "author": {
     "name": "James BonTempo",

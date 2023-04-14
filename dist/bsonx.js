@@ -12,10 +12,14 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
 };
 var _Serializer_instances, _Serializer_toBuffer, _Deserializer_instances, _Deserializer_buffer, _Deserializer_index, _Deserializer_deserialize, _Deserializer_typeFrom, _Deserializer_newPrimitive, _Deserializer_newArray, _Deserializer_newError;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Deserializer = exports.deserialize = exports.Serializer = exports.serialize = void 0;
+exports.Deserializer = exports.deserialize = exports.Serializer = exports.serialize = exports.clone = void 0;
 const node_buffer_1 = require("node:buffer");
 const constants_1 = require("./constants");
 const utils_1 = require("./utils");
+function clone(item) {
+    return new Deserializer().deserialize(new Serializer().serialize(item));
+}
+exports.clone = clone;
 function serialize(item) {
     return new Serializer().serialize(item);
 }

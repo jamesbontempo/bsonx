@@ -3,6 +3,10 @@ import { primitive, array, error, allowable } from "./types";
 import { BSONXTypes, PRIMITIVES, ARRAYS, ERRORS } from "./constants"
 import { isPrimitive, isArray, isError, isString, isSet, isMap, isObject, typeOf, isAllowable } from "./utils";
 
+export function clone(item: allowable): allowable {
+    return new Deserializer().deserialize(new Serializer().serialize(item));
+}
+
 export function serialize(item: allowable): Buffer {
     return new Serializer().serialize(item);
 }

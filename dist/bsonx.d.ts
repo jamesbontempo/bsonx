@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { Buffer } from "node:buffer";
 import { allowable } from "./types";
+export declare function clone(item: allowable): allowable;
 export declare function serialize(item: allowable): Buffer;
 export declare class Serializer {
     #private;
